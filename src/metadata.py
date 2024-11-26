@@ -2,22 +2,19 @@
 
 import os
 from typing import Dict, Any
-from anthropic import Anthropic
 from decimal import Decimal
-from .config import INPUT_COST_PER_MILLION, OUTPUT_COST_PER_MILLION
+from .config import INPUT_COST_PER_MILLION, OUTPUT_COST_PER_MILLION, LLM_CONFIG
+from .llm_providers import LLMProvider, create_llm_provider
 
 class MetadataExtractor:
-    def __init__(self, claude_api_key: str):
+    def __init__(self, llm_type: str = 'anthropic', **llm_kwargs):
         """
         Initialise l'extracteur de métadonnées.
         
         Args:
-            claude_api_key: Clé API Anthropic pour Claude
+            llm_type: Type de LLM à utiliser ('anthropic' ou 'llama')
+            **llm_kwargs: Arguments spécifiques au LLM
         """
-        self.anthropic = Anthropic(api_key=claude_api_key)
-        self.total_input_tokens = 0
-        self.total_output_tokens = 0
-        
         # Vérifier la présence des fichiers nécessaires
         required_files = ['rules.txt', 'output.txt']
         missing_files = [f for f in required_files if not os.path.exists(f)]
@@ -26,10 +23,19 @@ class MetadataExtractor:
                 f"Fichiers requis manquants : {', '.join(missing_files)}. "
                 "Ces fichiers sont nécessaires pour l'extraction des métadonnées."
             )
+        
+        # Fusionner la configuration par défaut avec les arguments fournis
+        config = LLM_CONFIG.get(llm_type, {}).copy()
+        config.update(llm_kwargs)
+        
+        # Créer le fournisseur LLM
+        self.llm = create_llm_provider(llm_type, **config)
+        self.total_input_tokens = 0
+        self.total_output_tokens = 0
 
     def extract_metadata(self, text: str) -> Dict[str, Any]:
         """
-        Utilise Claude pour extraire les métadonnées d'un texte selon des règles spécifiques.
+        Utilise le LLM pour extraire les métadonnées d'un texte selon des règles spécifiques.
         """
         # Charger les règles et le format de sortie
         with open('rules.txt', 'r', encoding='utf-8') as f:
@@ -50,33 +56,30 @@ Texte à analyser:
 {text}
 """
 
-        message = self.anthropic.messages.create(
-            model="claude-3-5-haiku-latest",
-            max_tokens=1000,
-            temperature=0,
-            system="Vous êtes un assistant spécialisé dans l'extraction de métadonnées de documents administratifs, suivant des règles strictes.",
-            messages=[{"role": "user", "content": prompt}]
-        )
-        
-        self.total_input_tokens += message.usage.input_tokens
-        self.total_output_tokens += message.usage.output_tokens
+        system_prompt = "Vous êtes un assistant spécialisé dans l'extraction de métadonnées de documents administratifs, suivant des règles strictes."
         
         try:
-            # Nettoyer la sortie de tout formatage superflu
-            clean_output = message.content[0].text
-            clean_output = clean_output.replace('```json', '').replace('```', '').strip()
+            # Générer la réponse
+            result = self.llm.generate(prompt, system_prompt)
+            
+            # Mettre à jour les compteurs de tokens
+            self.total_input_tokens += result['usage']['input_tokens']
+            self.total_output_tokens += result['usage']['output_tokens']
+            
+            # Nettoyer la sortie
+            clean_output = result['content'].replace('```json', '').replace('```', '').strip()
             
             # Évaluer le JSON
-            result = eval(clean_output)
+            metadata = eval(clean_output)
             
             # Valider le format
-            self._validate_output_format(result)
+            self._validate_output_format(metadata)
             
-            return result
+            return metadata
             
         except Exception as e:
-            print("Sortie brute de Claude :")
-            print(message.content[0].text)
+            print("Sortie brute du LLM :")
+            print(result['content'] if 'content' in result else "Pas de contenu disponible")
             raise ValueError(f"Erreur lors de l'extraction des métadonnées: {str(e)}")
 
     def _validate_output_format(self, data: Dict[str, Any]) -> None:

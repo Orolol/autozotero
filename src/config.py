@@ -18,6 +18,22 @@ EASYOCR_CONFIG.ocr_options = EasyOcrOptions(
     use_gpu=True
 )
 
+# Configuration des modèles de langage
+LLM_CONFIG = {
+    # Configuration par défaut pour Anthropic
+    'anthropic': {
+        'model_name': 'claude-3-5-haiku-latest'
+    },
+    
+    # Configuration par défaut pour Llama
+    'llama': {
+        'repo_id': 'bartowski/Meta-Llama-3.1-8B-Instruct-GGUF',
+        'filename': 'Meta-Llama-3.1-8B-Instruct-Q4_K_M.gguf',
+        'n_ctx': 8192,
+        'verbose': True
+    }
+}
+
 # Coûts API Claude
 INPUT_COST_PER_MILLION = 1.00
 OUTPUT_COST_PER_MILLION = 5.00
