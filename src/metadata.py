@@ -17,42 +17,38 @@ class MetadataExtractor:
         self.anthropic = Anthropic(api_key=claude_api_key)
         self.total_input_tokens = 0
         self.total_output_tokens = 0
+        
+        # Vérifier la présence des fichiers nécessaires
+        required_files = ['rules.txt', 'output.txt']
+        missing_files = [f for f in required_files if not os.path.exists(f)]
+        if missing_files:
+            raise FileNotFoundError(
+                f"Fichiers requis manquants : {', '.join(missing_files)}. "
+                "Ces fichiers sont nécessaires pour l'extraction des métadonnées."
+            )
 
     def extract_metadata(self, text: str) -> Dict[str, Any]:
         """
         Utilise Claude pour extraire les métadonnées d'un texte selon des règles spécifiques.
         """
-        if not os.path.exists('rules.txt'):
-            raise FileNotFoundError("Le fichier rules.txt est requis mais n'a pas été trouvé")
-
+        # Charger les règles et le format de sortie
         with open('rules.txt', 'r', encoding='utf-8') as f:
             rules = f.read()
+            
+        with open('output.txt', 'r', encoding='utf-8') as f:
+            output_format = f.read()
 
         prompt = f"""En utilisant ces règles spécifiques pour l'analyse des documents:
 
-        {rules}
+{rules}
 
-        Analysez ce document et extrayez les métadonnées suivantes au format JSON:
-        - title (chercher "objet:" ou "A/S:", sinon le titre en haut au milieu)
-        - authors (liste d'objets avec les champs suivants pour chaque auteur:
-            - lastName: nom de famille si connu, sinon None
-            - firstName: prénom si connu, sinon None
-            - denomination: titre ou qualité de l'auteur si pas de nom/prénom, sinon None
-          Note: un auteur doit avoir soit lastName+firstName, soit denomination, mais pas les deux)
-        - reportNumber (vérifier les en-têtes)
-        - institution (chercher dans l'en-tête en haut à gauche)
-        - place (chercher dans l'en-tête en haut à droite, en anglais)
-        - date (format DD/MM/YYYY)
-        - language (garder la langue originale du document)
+Le format de sortie attendu est le suivant:
 
-        Ignorer tout contenu après une page commençant par "Annexe".
+{output_format}
 
-        En cas de valeurs manquantes, utiliser None.
-        La sortie doit être un JSON valide qui sera évalué en Python. Retourner uniquement le JSON.
-        
-        Texte à analyser:
-        {text}
-        """
+Texte à analyser:
+{text}
+"""
 
         message = self.anthropic.messages.create(
             model="claude-3-5-haiku-latest",
@@ -66,10 +62,85 @@ class MetadataExtractor:
         self.total_output_tokens += message.usage.output_tokens
         
         try:
-            return eval(message.content[0].text.replace('```json', '').replace('```', ''))
+            # Nettoyer la sortie de tout formatage superflu
+            clean_output = message.content[0].text
+            clean_output = clean_output.replace('```json', '').replace('```', '').strip()
+            
+            # Évaluer le JSON
+            result = eval(clean_output)
+            
+            # Valider le format
+            self._validate_output_format(result)
+            
+            return result
+            
         except Exception as e:
+            print("Sortie brute de Claude :")
             print(message.content[0].text)
             raise ValueError(f"Erreur lors de l'extraction des métadonnées: {str(e)}")
+
+    def _validate_output_format(self, data: Dict[str, Any]) -> None:
+        """
+        Valide le format des données extraites.
+        
+        Args:
+            data: Données à valider
+            
+        Raises:
+            ValueError: Si le format n'est pas valide
+        """
+        required_fields = ['title', 'authors', 'reportNumber', 'institution', 'place', 'date', 'language', 'tags']
+        
+        # Vérifier la présence de tous les champs
+        for field in required_fields:
+            if field not in data:
+                raise ValueError(f"Champ manquant : {field}")
+        
+        # Valider le format des auteurs
+        if not isinstance(data['authors'], list):
+            raise ValueError("Le champ 'authors' doit être une liste")
+            
+        for author in data['authors']:
+            if not isinstance(author, dict):
+                raise ValueError("Chaque auteur doit être un dictionnaire")
+                
+            if 'lastName' not in author or 'firstName' not in author or 'denomination' not in author:
+                raise ValueError("Format d'auteur invalide : champs manquants")
+                
+            # Vérifier la règle lastName+firstName XOR denomination
+            has_name = author['lastName'] is not None or author['firstName'] is not None
+            has_denom = author['denomination'] is not None
+            
+            if has_name and has_denom:
+                raise ValueError("Un auteur ne peut pas avoir à la fois un nom/prénom et une dénomination")
+            if not has_name and not has_denom:
+                raise ValueError("Un auteur doit avoir soit un nom/prénom, soit une dénomination")
+        
+        # Valider le format de la date
+        if data['date'] is not None:
+            import re
+            if not re.match(r'^\d{2}/\d{2}/\d{4}$', data['date']):
+                raise ValueError("Format de date invalide (doit être DD/MM/YYYY)")
+                
+        # Valider le format des tags
+        if not isinstance(data['tags'], list):
+            raise ValueError("Le champ 'tags' doit être une liste")
+            
+        for tag_obj in data['tags']:
+            if not isinstance(tag_obj, dict):
+                raise ValueError("Chaque tag doit être un dictionnaire")
+                
+            if 'tag' not in tag_obj:
+                raise ValueError("Format de tag invalide : champ 'tag' manquant")
+                
+            if not isinstance(tag_obj['tag'], str):
+                raise ValueError("Le tag doit être une chaîne de caractères")
+                
+            if not tag_obj['tag'].startswith("./"):
+                raise ValueError("Les tags doivent commencer par './'")
+                
+            if len(tag_obj['tag']) <= 2:  # Juste "./" n'est pas valide
+                raise ValueError("Tag invalide : trop court")
 
     def calculate_cost(self) -> Dict[str, Decimal]:
         """

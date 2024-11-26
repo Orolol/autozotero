@@ -49,7 +49,6 @@ Langue: Conserver la langue originale du document
 Tags automatiques (préfixe "./"):
 1. Préfixe du numéro de rapport (ex: "./SCH" pour SCH/II-AS)
 2. Titres des sections/chapitres numérotés
-3. Mots-clés spécifiques trouvés dans le titre ou sous-titres
 
 Champs supplémentaires:
 - Date de consultation: extraite du nom de fichier Camscanner (format DD/MM/YYYY)
