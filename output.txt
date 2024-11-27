@@ -1,0 +1,37 @@
+Format de sortie JSON attendu :
+
+{
+    "title": str | None,        # Titre du document
+    "authors": [                # Liste des auteurs
+        {
+            "lastName": str | None,      # Nom de famille si connu
+            "firstName": str | None,     # Prénom si connu
+            "denomination": str | None    # Titre/qualité si pas de nom/prénom
+        }
+    ],
+    "reportNumber": str | None, # Numéro du rapport (ex: "SCH/II-AS 123", "MLC/2023/42")
+    "institution": str | None,  # Format: "sous-sous-échelon, sous-échelon, échelon (Pays/Organisation)"
+    "place": str | None,       # Ville en anglais (ex: "Brussels", "Paris")
+    "date": str | None,        # Format: "DD/MM/YYYY"
+    "language": str | None,    # Langue originale du document (ex: "fra", "eng")
+    "tags": [                  # Liste des tags automatiques
+        {
+            "tag": str         # Format: "./TAG" (ex: "./SCH", "./Libre Circulation")
+        }
+    ]
+}
+
+Notes importantes :
+1. Tous les champs sont optionnels, utiliser None si non trouvé
+2. Pour les auteurs, chaque entrée doit avoir :
+   - SOIT lastName + firstName (denomination = None)
+   - SOIT denomination (lastName = None, firstName = None)
+   - JAMAIS les trois remplis
+3. Le champ institution doit suivre strictement le format hiérarchique
+4. Le champ place doit toujours être en anglais
+5. Le champ date doit strictement suivre le format DD/MM/YYYY
+6. Pour les tags :
+   - Toujours préfixés par "./"
+   - Inclure le préfixe du numéro de rapport (ex: "./SCH" pour SCH/II-AS)
+   - Inclure les titres des sections/chapitres numérotés
+7. Retourner uniquement le JSON, sans autre texte ou formatage
