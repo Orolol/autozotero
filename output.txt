@@ -24,8 +24,8 @@ Format de sortie JSON attendu :
 Notes importantes :
 1. Tous les champs sont optionnels, utiliser None si non trouvé
 2. Pour les auteurs, chaque entrée doit avoir :
-   - SOIT lastName + firstName (denomination = None)
-   - SOIT denomination (lastName = None, firstName = None)
+   - SOIT lastName et firstName (denomination = ""). Les deux champs doivent être remplis
+   - SOIT denomination (lastName = "", firstName = "")
    - JAMAIS les trois remplis
 3. Le champ institution doit suivre strictement le format hiérarchique
 4. Le champ place doit toujours être en anglais

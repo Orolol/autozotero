@@ -20,6 +20,7 @@ Exemples d'utilisation :
   %(prog)s ABC123XY            # Traite un document spécifique
   %(prog)s --folder /chemin --recursive --pattern "*.pdf"  # Traite tous les PDF récursivement
   %(prog)s --folder /chemin --collections ABC123,XYZ789    # Ajoute à plusieurs collections
+  %(prog)s --folder /chemin --local-model                  # Utilise le modèle local au lieu de Claude
         """
     )
     parser.add_argument('item_id', nargs='?', help='ID spécifique d\'un document à traiter')
@@ -31,6 +32,8 @@ Exemples d'utilisation :
     parser.add_argument('--recursive', action='store_true', help='Traiter les sous-dossiers')
     parser.add_argument('--pattern', help='Pattern glob pour filtrer les noms de fichiers (ex: "2024*.pdf")')
     parser.add_argument('--keep-duplicates', action='store_true', help='Ne pas ignorer les doublons')
+    parser.add_argument('--local-model', action='store_true', help='Utiliser le modèle local au lieu de Claude')
+    parser.add_argument('--use-openrouter', action='store_true', help='Utiliser OpenRouter au lieu de Claude')
     args = parser.parse_args()
 
     # Charger les variables d'environnement
@@ -40,7 +43,8 @@ Exemples d'utilisation :
         print("ZOTERO_LIBRARY_ID=votre_library_id")
         print("ZOTERO_LIBRARY_TYPE=user_ou_group")
         print("ZOTERO_API_KEY=votre_cle_api_zotero")
-        print("CLAUDE_API_KEY=votre_cle_api_claude")
+        if not args.local_model:
+            print("CLAUDE_API_KEY=votre_cle_api_claude")
         sys.exit(1)
 
     load_dotenv()
@@ -50,8 +54,13 @@ Exemples d'utilisation :
         "ZOTERO_LIBRARY_ID": "ID de votre bibliothèque Zotero",
         "ZOTERO_LIBRARY_TYPE": "Type de bibliothèque ('user' ou 'group')",
         "ZOTERO_API_KEY": "Clé API Zotero (https://www.zotero.org/settings/keys)",
-        "CLAUDE_API_KEY": "Clé API Claude (https://console.anthropic.com/)"
     }
+    
+    if not args.local_model:
+        if args.use_openrouter:
+            required_vars["OPENROUTER_API_KEY"] = "Clé API OpenRouter"
+        else:
+            required_vars["CLAUDE_API_KEY"] = "Clé API Claude (https://console.anthropic.com/)"
     
     missing_vars = []
     for var, description in required_vars.items():
@@ -68,11 +77,21 @@ Exemples d'utilisation :
             os.getenv("ZOTERO_LIBRARY_ID"),
             os.getenv("ZOTERO_LIBRARY_TYPE"),
             os.getenv("ZOTERO_API_KEY"),
-            os.getenv("CLAUDE_API_KEY")
+            os.getenv("CLAUDE_API_KEY") if not (args.local_model or args.use_openrouter) else None,
+            use_local_model=args.local_model,
+            use_openrouter=args.use_openrouter,
+            openrouter_config={"api_key": os.getenv("OPENROUTER_API_KEY")} if args.use_openrouter else None
         )
         
         if args.verbose:
-            print("✓ Connexion établie avec Zotero et Claude")
+            print("✓ Connexion établie avec Zotero")
+            if args.local_model:
+                model_type = 'local'
+            elif args.use_openrouter:
+                model_type = 'OpenRouter'
+            else:
+                model_type = 'Claude'
+            print(f"✓ Modèle utilisé : {model_type}")
             print(f"✓ Mode OCR : {'activé' if args.ocr else 'désactivé'}")
             print(f"✓ Mode simulation : {'activé' if args.dry_run else 'désactivé'}")
             if args.folder:
@@ -80,7 +99,6 @@ Exemples d'utilisation :
                 print(f"✓ Vérification doublons : {'désactivée' if args.keep_duplicates else 'activée'}")
                 if args.pattern:
                     print(f"✓ Filtre : {args.pattern}")
-        
         # Traitement d'un dossier de PDF
         if args.folder:
             if not os.path.isdir(args.folder):
@@ -94,7 +112,6 @@ Exemples d'utilisation :
                 sys.exit(0)
             
             print(f"Traitement de {len(pdf_files)} fichiers PDF...")
-            
             # Convertir la liste de collections
             collections = args.collections.split(',') if args.collections else None
             
@@ -102,6 +119,7 @@ Exemples d'utilisation :
             processed = []
             skipped = []
             failed = []
+            
             
             for i, pdf_path in enumerate(pdf_files, 1):
                 try:
@@ -158,8 +176,53 @@ Exemples d'utilisation :
         # Traitement de tous les documents
         else:
             print("Traitement de tous les documents...")
-            # TODO: Implémenter le traitement de tous les documents
-            print("Fonctionnalité non implémentée")
+             # Traiter tous les documents
+            valid_types = ['document', 'journalArticle', 'bookSection', 'report', 'thesis', 'webpage']
+            items = updater.zot.items(itemType="-attachment")  # Récupère tous les items non-attachements
+            print(f"Nombre total d'items trouvés: {len(items)}")
+            
+            # Filtrer les items par type
+            items_to_process = [item for item in items if item['data'].get('itemType') in valid_types]
+            print(f"Nombre d'items à traiter (types valides): {len(items_to_process)}")
+            
+            # Traiter chaque PDF
+            processed = []
+            skipped = []
+            failed = []
+            
+            for item in items_to_process:
+                try:
+                    print(f"\nTraitement de l'item {item['key']} ({item['data'].get('title', 'Sans titre')})")
+                    updated = updater.check_and_update_metadata(item, force_update=True, use_ocr=args.ocr)
+                    
+                    if updated:
+                        print(f"✓ Métadonnées mises à jour pour l'item {item['key']}")
+                        processed.append(item['key'])
+                    else:
+                        print(f"- Pas de mise à jour nécessaire pour l'item {item['key']}")
+                        skipped.append(item['key'])
+                except Exception as e:
+                    print(f"✗ Erreur lors du traitement de l'item {item['key']}: {str(e)}")
+                    failed.append(item['key'])
+        
+            # Afficher le résumé
+            print(f"\nRésumé du traitement :")
+            print(f"- {len(processed)} documents traités avec succès")
+            print(f"- {len(skipped)} documents ignorés (doublons)")
+            print(f"- {len(failed)} documents en erreur")
+            
+            if failed:
+                print("\nDocuments en erreur :")
+                for path in failed:
+                    print(f"- {path}")
+            
+            # Afficher les coûts
+            if not args.dry_run and processed:
+                cost_stats = updater.calculate_cost()
+                print("\nStatistiques d'utilisation et coûts:")
+                print(f"Tokens en entrée: {cost_stats['input_tokens']:,}")
+                print(f"Tokens en sortie: {cost_stats['output_tokens']:,}")
+                print(f"Coût total: ${cost_stats['total_cost']:.4f}")
             sys.exit(1)
             
     except Exception as e:

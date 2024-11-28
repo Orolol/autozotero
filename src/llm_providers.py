@@ -2,8 +2,10 @@
 
 from abc import ABC, abstractmethod
 from typing import Dict, Any, Optional
+from decimal import Decimal
 from anthropic import Anthropic
 from llama_cpp import Llama
+from openai import OpenAI
 
 class LLMProvider(ABC):
     """Classe abstraite pour les fournisseurs de LLM."""
@@ -53,6 +55,46 @@ class AnthropicProvider(LLMProvider):
             }
         }
 
+class OpenRouterProvider(LLMProvider):
+    """Fournisseur utilisant OpenRouter pour accéder à divers modèles."""
+    
+    def __init__(self, api_key: str, base_url: str, model_name: str):
+        """
+        Initialise le fournisseur OpenRouter.
+        
+        Args:
+            api_key: Clé API OpenRouter
+            base_url: URL de base de l'API
+            model_name: Nom du modèle à utiliser
+        """
+        self.client = OpenAI(
+            base_url=base_url,
+            api_key=api_key
+        )
+        self.model_name = model_name
+
+    def generate(self, prompt: str, system_prompt: str = None) -> Dict[str, Any]:
+        messages = []
+        if system_prompt:
+            messages.append({"role": "system", "content": system_prompt})
+        messages.append({"role": "user", "content": prompt})
+        try:
+            response = self.client.chat.completions.create(
+                model=self.model_name,
+            messages=messages
+            )
+        except Exception as e:
+            print(f"Erreur lors de la génération : {e}")
+            raise
+        
+        return {
+            'content': response.choices[0].message.content,
+            'usage': {
+                'input_tokens': response.usage.prompt_tokens,
+                'output_tokens': response.usage.completion_tokens
+            }
+        }
+
 class LlamaProvider(LLMProvider):
     """Fournisseur utilisant un modèle Llama local."""
     
@@ -79,10 +121,12 @@ class LlamaProvider(LLMProvider):
                 repo_id=repo_id,
                 filename=filename,
                 n_ctx=n_ctx,
+                n_gpu_layers=-1,
                 **kwargs
             )
 
     def generate(self, prompt: str, system_prompt: str = None) -> Dict[str, Any]:
+        """Génère une réponse à partir d'un prompt."""
         # Construire le prompt complet
         if system_prompt:
             full_prompt = f"{system_prompt}\n\n{prompt}"
@@ -90,27 +134,32 @@ class LlamaProvider(LLMProvider):
             full_prompt = prompt
             
         # Générer la réponse
-        output = self.model(
-            full_prompt,
-            max_tokens=1000,
-            temperature=0,
-            echo=False
-        )
-        
-        return {
-            'content': output['choices'][0]['text'],
-            'usage': {
-                'input_tokens': output.get('usage', {}).get('prompt_tokens', 0),
-                'output_tokens': output.get('usage', {}).get('completion_tokens', 0)
+        try:
+            output = self.model(
+                full_prompt,
+                max_tokens=1000,
+                temperature=0.1,
+                echo=False
+            )
+            
+            return {
+                'content': output['choices'][0]['text'],
+                'usage': {
+                    'input_tokens': output.get('usage', {}).get('prompt_tokens', 0),
+                    'output_tokens': output.get('usage', {}).get('completion_tokens', 0)
+                }
             }
-        }
+            
+        except Exception as e:
+            print(f"Erreur lors de la génération : {e}")
+            raise
 
 def create_llm_provider(provider_type: str, **kwargs) -> LLMProvider:
     """
     Crée un fournisseur LLM selon le type spécifié.
     
     Args:
-        provider_type: Type de fournisseur ('anthropic' ou 'llama')
+        provider_type: Type de fournisseur ('anthropic', 'openrouter' ou 'llama')
         **kwargs: Arguments spécifiques au fournisseur
         
     Returns:
@@ -118,6 +167,7 @@ def create_llm_provider(provider_type: str, **kwargs) -> LLMProvider:
     """
     providers = {
         'anthropic': AnthropicProvider,
+        'openrouter': OpenRouterProvider,
         'llama': LlamaProvider
     }
     

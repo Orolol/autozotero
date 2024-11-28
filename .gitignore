@@ -32,3 +32,5 @@ wheels/
 *.swp
 *.swo
 .DS_Store 
+
+data/

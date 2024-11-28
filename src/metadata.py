@@ -3,7 +3,7 @@
 import os
 from typing import Dict, Any
 from decimal import Decimal
-from .config import INPUT_COST_PER_MILLION, OUTPUT_COST_PER_MILLION, LLM_CONFIG
+from .config import LLM_CONFIG
 from .llm_providers import LLMProvider, create_llm_provider
 
 class MetadataExtractor:
@@ -12,7 +12,7 @@ class MetadataExtractor:
         Initialise l'extracteur de métadonnées.
         
         Args:
-            llm_type: Type de LLM à utiliser ('anthropic' ou 'llama')
+            llm_type: Type de LLM à utiliser ('anthropic', 'openrouter' ou 'llama')
             **llm_kwargs: Arguments spécifiques au LLM
         """
         # Vérifier la présence des fichiers nécessaires
@@ -24,12 +24,18 @@ class MetadataExtractor:
                 "Ces fichiers sont nécessaires pour l'extraction des métadonnées."
             )
         
-        # Fusionner la configuration par défaut avec les arguments fournis
-        config = LLM_CONFIG.get(llm_type, {}).copy()
-        config.update(llm_kwargs)
+        # Récupérer la configuration du modèle
+        if llm_type not in LLM_CONFIG:
+            raise ValueError(f"Type de LLM non supporté : {llm_type}")
+            
+        self.config = LLM_CONFIG[llm_type].copy()
+        self.config.update(llm_kwargs)
+        
+        # Extraire les coûts de la configuration
+        self.costs = self.config.pop('costs', {'input_tokens': Decimal('0'), 'output_tokens': Decimal('0')})
         
         # Créer le fournisseur LLM
-        self.llm = create_llm_provider(llm_type, **config)
+        self.llm = create_llm_provider(llm_type, **self.config)
         self.total_input_tokens = 0
         self.total_output_tokens = 0
 
@@ -46,17 +52,20 @@ class MetadataExtractor:
 
         prompt = f"""En utilisant ces règles spécifiques pour l'analyse des documents:
 
-{rules}
+        {rules}
 
-Le format de sortie attendu est le suivant:
+        Le format de sortie attendu est le suivant:
 
-{output_format}
+        {output_format}
 
-Texte à analyser:
-{text}
-"""
+        Texte à analyser:
+        {text}
+        
+        Ne pas répéter le texte à analyser dans la réponse. 
+        Répondre uniquement en JSON.
+        """
 
-        system_prompt = "Vous êtes un assistant spécialisé dans l'extraction de métadonnées de documents administratifs, suivant des règles strictes."
+        system_prompt = "Vous êtes un assistant spécialisé dans l'extraction de métadonnées de documents administratifs, suivant des règles strictes. Vous répondez en JSON, lu par du Python (null pour une valeur nulle)."
         
         try:
             # Générer la réponse
@@ -66,21 +75,55 @@ Texte à analyser:
             self.total_input_tokens += result['usage']['input_tokens']
             self.total_output_tokens += result['usage']['output_tokens']
             
-            # Nettoyer la sortie
-            clean_output = result['content'].replace('```json', '').replace('```', '').strip()
+            # Extraire et nettoyer le JSON
+            json_str = self._extract_json_from_text(result['content'])
             
-            # Évaluer le JSON
-            metadata = eval(clean_output)
+            # Remplacer "None" par "null" avant de parser
+            json_str = json_str.replace(': None', ': null')
+            json_str = json_str.replace(':None', ':null')
             
-            # Valider le format
-            self._validate_output_format(metadata)
-            
-            return metadata
+            # Parser le JSON
+            try:
+                import json
+                metadata = json.loads(json_str)
+                
+                print("Métadonnées parsées :", metadata)  # Debug
+                
+                # Valider le format
+                self._validate_output_format(metadata)
+                
+                return metadata
+                
+            except json.JSONDecodeError as e:
+                print(f"Erreur de décodage JSON : {e}")
+                print(f"JSON reçu : {json_str}")  # Debug
+                raise ValueError(f"JSON invalide : {e}")
             
         except Exception as e:
             print("Sortie brute du LLM :")
             print(result['content'] if 'content' in result else "Pas de contenu disponible")
             raise ValueError(f"Erreur lors de l'extraction des métadonnées: {str(e)}")
+
+    def _extract_json_from_text(self, text: str) -> str:
+        """
+        Extrait l'objet JSON d'un texte en prenant le contenu entre le premier { et le dernier }.
+        
+        Args:
+            text: Texte contenant potentiellement un objet JSON
+            
+        Returns:
+            str: Chaîne JSON extraite
+            
+        Raises:
+            ValueError: Si aucun JSON valide n'est trouvé
+        """
+        start = text.find('{')
+        end = text.rfind('}')
+        
+        if start == -1 or end == -1:
+            raise ValueError("Aucun objet JSON n'a été trouvé dans la réponse")
+            
+        return text[start:end + 1]
 
     def _validate_output_format(self, data: Dict[str, Any]) -> None:
         """
@@ -92,68 +135,55 @@ Texte à analyser:
         Raises:
             ValueError: Si le format n'est pas valide
         """
-        required_fields = ['title', 'authors', 'reportNumber', 'institution', 'place', 'date', 'language', 'tags']
-        
-        # Vérifier la présence de tous les champs
-        for field in required_fields:
-            if field not in data:
-                raise ValueError(f"Champ manquant : {field}")
-        
-        # Valider le format des auteurs
-        if not isinstance(data['authors'], list):
-            raise ValueError("Le champ 'authors' doit être une liste")
-            
-        for author in data['authors']:
-            if not isinstance(author, dict):
-                raise ValueError("Chaque auteur doit être un dictionnaire")
+        # Valider le format des auteurs si présent
+        if 'authors' in data:
+            if not isinstance(data['authors'], list):
+                print(f"Type de authors reçu : {type(data['authors'])}")
+                print(f"Contenu de authors : {data['authors']}")
+                raise ValueError("Le champ 'authors' doit être une liste")
                 
-            if 'lastName' not in author or 'firstName' not in author or 'denomination' not in author:
-                raise ValueError("Format d'auteur invalide : champs manquants")
-                
-            # Vérifier la règle lastName+firstName XOR denomination
-            has_name = author['lastName'] is not None or author['firstName'] is not None
-            has_denom = author['denomination'] is not None
-            
-            if has_name and has_denom:
-                raise ValueError("Un auteur ne peut pas avoir à la fois un nom/prénom et une dénomination")
-            if not has_name and not has_denom:
-                raise ValueError("Un auteur doit avoir soit un nom/prénom, soit une dénomination")
-        
-        # Valider le format de la date
-        if data['date'] is not None:
+            for i, author in enumerate(data['authors']):
+                if not isinstance(author, dict):
+                    print(f"Type d'auteur invalide à l'index {i}: {type(author)}")
+                    raise ValueError(f"Chaque auteur doit être un dictionnaire, reçu: {type(author)}")
+
+        # Valider le format de la date si présente
+        if 'date' in data and data['date'] is not None:
             import re
             if not re.match(r'^\d{2}/\d{2}/\d{4}$', data['date']):
-                raise ValueError("Format de date invalide (doit être DD/MM/YYYY)")
+                raise ValueError(f"Format de date invalide (doit être DD/MM/YYYY): {data['date']}")
                 
-        # Valider le format des tags
-        if not isinstance(data['tags'], list):
-            raise ValueError("Le champ 'tags' doit être une liste")
-            
-        for tag_obj in data['tags']:
-            if not isinstance(tag_obj, dict):
-                raise ValueError("Chaque tag doit être un dictionnaire")
+        # Valider le format des tags si présents
+        if 'tags' in data:
+            if not isinstance(data['tags'], list):
+                raise ValueError("Le champ 'tags' doit être une liste")
                 
-            if 'tag' not in tag_obj:
-                raise ValueError("Format de tag invalide : champ 'tag' manquant")
-                
-            if not isinstance(tag_obj['tag'], str):
-                raise ValueError("Le tag doit être une chaîne de caractères")
-                
-            if not tag_obj['tag'].startswith("./"):
-                raise ValueError("Les tags doivent commencer par './'")
-                
-            if len(tag_obj['tag']) <= 2:  # Juste "./" n'est pas valide
-                raise ValueError("Tag invalide : trop court")
+            for i, tag_obj in enumerate(data['tags']):
+                if not isinstance(tag_obj, dict):
+                    print(f"Type de tag invalide à l'index {i}: {type(tag_obj)}")
+                    raise ValueError(f"Chaque tag doit être un dictionnaire, reçu: {type(tag_obj)}")
+                    
+                if 'tag' not in tag_obj:
+                    raise ValueError(f"Format de tag invalide : champ 'tag' manquant dans l'objet {tag_obj}")
+                    
+                if not isinstance(tag_obj['tag'], str):
+                    raise ValueError(f"Le tag doit être une chaîne de caractères, reçu: {type(tag_obj['tag'])}")
+                    
+                if not tag_obj['tag'].startswith("./"):
+                    raise ValueError(f"Les tags doivent commencer par './', reçu: {tag_obj['tag']}")
+                    
+                if len(tag_obj['tag']) <= 2:  # Juste "./" n'est pas valide
+                    raise ValueError(f"Tag invalide : trop court - {tag_obj['tag']}")
 
-    def calculate_cost(self) -> Dict[str, Decimal]:
+    def calculate_cost(self) -> Dict[str, Any]:
         """
-        Calcule le coût total basé sur l'utilisation des tokens.
+        Calcule le coût total basé sur l'utilisation des tokens et les coûts du modèle.
         
         Returns:
             Dict contenant les coûts détaillés et le total
         """
-        input_cost = (Decimal(self.total_input_tokens) / Decimal('1000000')) * Decimal(str(INPUT_COST_PER_MILLION))
-        output_cost = (Decimal(self.total_output_tokens) / Decimal('1000000')) * Decimal(str(OUTPUT_COST_PER_MILLION))
+        input_cost = (Decimal(self.total_input_tokens) / Decimal('1000000')) * self.costs['input_tokens']
+        output_cost = (Decimal(self.total_output_tokens) / Decimal('1000000')) * self.costs['output_tokens']
         
         return {
             'input_tokens': self.total_input_tokens,
@@ -162,3 +192,21 @@ Texte à analyser:
             'output_cost': output_cost,
             'total_cost': input_cost + output_cost
         } 
+
+    def _convert_nulls_to_none(self, data: Any) -> Any:
+        """
+        Convertit récursivement les null JSON en None Python.
+        
+        Args:
+            data: Données à convertir
+            
+        Returns:
+            Données avec les null convertis en None
+        """
+        if isinstance(data, dict):
+            return {k: self._convert_nulls_to_none(v) for k, v in data.items()}
+        elif isinstance(data, list):
+            return [self._convert_nulls_to_none(item) for item in data]
+        elif data is None:
+            return None
+        return data 

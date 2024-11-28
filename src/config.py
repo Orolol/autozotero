@@ -1,6 +1,7 @@
 """Configuration du projet."""
 
 from docling.datamodel.pipeline_options import PdfPipelineOptions, TesseractOcrOptions, EasyOcrOptions
+from decimal import Decimal
 
 # Configuration OCR
 DEFAULT_OCR_CONFIG = PdfPipelineOptions()
@@ -20,23 +21,37 @@ EASYOCR_CONFIG.ocr_options = EasyOcrOptions(
 
 # Configuration des modèles de langage
 LLM_CONFIG = {
-    # Configuration par défaut pour Anthropic
+    # Configuration pour Anthropic
     'anthropic': {
-        'model_name': 'claude-3-5-haiku-latest'
+        'model_name': 'claude-3-5-haiku-latest',
+        'costs': {
+            'input_tokens': Decimal('1.00'),  # Coût par million de tokens
+            'output_tokens': Decimal('5.00')
+        }
     },
     
-    # Configuration par défaut pour Llama
+    # Configuration pour OpenRouter
+    'openrouter': {
+        'base_url': 'https://openrouter.ai/api/v1',
+        'model_name': 'openai/gpt-4o-mini-2024-07-18',  # Par défaut, à ajuster selon les besoins
+        'costs': {
+            'input_tokens': Decimal('0.15'),  # À ajuster selon le modèle
+            'output_tokens': Decimal('0.6')
+        }
+    },
+    
+    # Configuration pour Llama local
     'llama': {
-        'repo_id': 'bartowski/Meta-Llama-3.1-8B-Instruct-GGUF',
-        'filename': 'Meta-Llama-3.1-8B-Instruct-Q4_K_M.gguf',
-        'n_ctx': 8192,
-        'verbose': True
+        'repo_id': 'QuantFactory/Qwen2.5-7B-GGUF',
+        'filename': 'Qwen2.5-7B.Q4_K_M.gguf',
+        'n_ctx': 5000,
+        'verbose': False,
+        'costs': {
+            'input_tokens': Decimal('0'),  # Gratuit car local
+            'output_tokens': Decimal('0')
+        }
     }
 }
-
-# Coûts API Claude
-INPUT_COST_PER_MILLION = 1.00
-OUTPUT_COST_PER_MILLION = 5.00
 
 # Types de documents valides
 VALID_ITEM_TYPES = [
