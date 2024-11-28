@@ -78,35 +78,74 @@ OPENROUTER_API_KEY=votre_cle_api_openrouter # Si utilisation d'OpenRouter
 
 ## Utilisation
 
+Le script peut être utilisé de trois manières différentes :
+
 ### 1. Traitement d'un document spécifique
 
-Pour traiter un seul document, utilisez son ID Zotero :
 ```bash
 python main.py ZOTERO_ITEM_ID
 ```
 
-Exemple :
+### 2. Traitement d'un dossier de PDF
+
 ```bash
-python main.py ABC123XY --ocr  # Avec OCR
+python main.py --folder /chemin/vers/dossier
 ```
 
-### 2. Traitement de tous les documents
+### 3. Traitement de tous les documents
 
-Pour traiter tous les documents de votre bibliothèque :
 ```bash
 python main.py
 ```
 
-Options disponibles :
-- `--ocr` : Active l'OCR pour les documents scannés
-- Plus d'options à venir...
+### Options disponibles
 
-### 3. Vérification des résultats
+```
+--ocr                  Utiliser l'OCR pour l'extraction du texte
+--dry-run             Simuler l'exécution sans modifier Zotero
+--verbose             Afficher plus de détails pendant l'exécution
+--folder              Chemin vers un dossier contenant des PDF à traiter
+--collections         Liste des clés de collections séparées par des virgules
+--recursive           Traiter les sous-dossiers
+--pattern             Pattern glob pour filtrer les noms de fichiers (ex: "2024*.pdf")
+--keep-duplicates     Ne pas ignorer les doublons
+--local-model         Utiliser le modèle local (Qwen2.5-7B) au lieu de Claude
+--use-openrouter      Utiliser OpenRouter au lieu de Claude
+```
 
-Après l'exécution, le script :
-1. Affiche les documents traités
-2. Indique les métadonnées mises à jour
-3. Montre les coûts d'utilisation de l'API Claude
+### Exemples d'utilisation
+
+```bash
+# Traiter tous les documents
+python main.py
+
+# Traiter un document spécifique avec OCR
+python main.py ABC123XY --ocr
+
+# Traiter tous les PDF d'un dossier récursivement
+python main.py --folder /chemin --recursive --pattern "*.pdf"
+
+# Ajouter les documents à plusieurs collections
+python main.py --folder /chemin --collections ABC123,XYZ789
+
+# Utiliser le modèle local au lieu de Claude
+python main.py --folder /chemin --local-model
+
+# Mode simulation avec affichage détaillé
+python main.py --folder /chemin --dry-run --verbose
+```
+
+### Résultats et statistiques
+
+Après l'exécution, le script affiche :
+1. Un résumé du traitement :
+   - Nombre de documents traités avec succès
+   - Nombre de documents ignorés (doublons)
+   - Nombre de documents en erreur
+2. Les statistiques d'utilisation et coûts (si applicable) :
+   - Nombre de tokens en entrée
+   - Nombre de tokens en sortie
+   - Coût total de l'utilisation des API
 
 ## Exemples de métadonnées extraites
 
