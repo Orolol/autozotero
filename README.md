@@ -17,7 +17,8 @@ Fonctionnalités principales :
 - Harmonisation des noms d'institutions
 - Extraction des métadonnées depuis les noms de fichiers Camscanner
 - Capitalisation automatique des champs
-- Gestion des coûts d'utilisation de l'API Claude
+- Support de multiples modèles de langage (Claude, OpenRouter, Llama local)
+- Gestion des coûts d'utilisation des API
 
 ## Prérequis
 
@@ -26,11 +27,13 @@ Fonctionnalités principales :
    - Une bibliothèque Zotero (personnelle ou groupe)
    - Une [clé API Zotero](https://www.zotero.org/settings/keys)
    - Votre ID de bibliothèque (visible dans les paramètres Zotero)
-3. **API Claude** :
-   - Une [clé API Anthropic](https://console.anthropic.com/)
-4. **OCR** (optionnel) :
-   - [Tesseract-OCR](https://github.com/UB-Mannheim/tesseract/wiki) (recommandé pour Windows)
-   - Ou EasyOCR (installation automatique via pip)
+3. **Modèles de Langage** (au choix) :
+   - [Claude API (Anthropic)](https://console.anthropic.com/) - Modèle claude-3-5-haiku-latest
+   - [OpenRouter API](https://openrouter.ai/) - Modèle gpt-4o-mini
+   - Llama local (Qwen2.5-7B)
+4. **OCR** (au choix) :
+   - Tesseract-OCR (français et anglais par défaut)
+   - EasyOCR (avec support GPU)
 
 ## Installation
 
@@ -51,18 +54,27 @@ ZOTERO_LIBRARY_ID=votre_library_id  # ex: 123456
 ZOTERO_LIBRARY_TYPE=user            # ou 'group'
 ZOTERO_API_KEY=votre_cle_api_zotero # ex: HGf91kNhas8917Jk...
 CLAUDE_API_KEY=votre_cle_api_claude # ex: sk-ant-api03-...
+OPENROUTER_API_KEY=votre_cle_api_openrouter # Si utilisation d'OpenRouter
 ```
 
 ## Configuration
 
-1. **Règles d'extraction** : Le fichier `rules.txt` contient les règles pour extraire les métadonnées. Vous pouvez les adapter selon vos besoins :
-   - Format du titre
-   - Position des auteurs
-   - Format des numéros de rapport
-   - Structure des institutions
-   - etc.
+1. **Modèles de Langage** : Trois options sont disponibles :
+   - Claude (Anthropic) : Modèle claude-3-5-haiku-latest
+   - OpenRouter : Modèle gpt-4o-mini-2024-07-18
+   - Llama local : Modèle Qwen2.5-7B avec contexte de 5000 tokens
 
-2. **OCR** : Par défaut, Tesseract est configuré pour le français et l'anglais. Modifiez `main.py` pour ajouter d'autres langues si nécessaire.
+2. **OCR** : Deux options sont disponibles :
+   - Tesseract (par défaut) : Configuré pour le français et l'anglais
+   - EasyOCR : Support GPU activé par défaut
+
+3. **Types de documents supportés** :
+   - document
+   - journalArticle
+   - bookSection
+   - report
+   - thesis
+   - webpage
 
 ## Utilisation
 
