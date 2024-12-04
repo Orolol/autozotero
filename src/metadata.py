@@ -97,6 +97,7 @@ class MetadataExtractor:
                 raise ValueError(f"JSON invalide : {e}")
             
         except Exception as e:
+            print(e)
             print("Sortie brute du LLM :")
             print(result['content'] if 'content' in result else "Pas de contenu disponible")
             raise ValueError(f"Erreur lors de l'extraction des métadonnées: {str(e)}")

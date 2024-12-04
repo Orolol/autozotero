@@ -43,8 +43,10 @@ Date:
 Langue: Conserver la langue originale du document
 
 Tags automatiques (préfixe "./"):
-1. Préfixe du numéro de rapport (ex: "./SCH" pour SCH/II-AS)
-2. Titres des sections/chapitres numérotés
+- Titres des sections, des chapitres 
+- Si le texte parle d'un pays, ajoute le tag du pays en question (ex: "./Allemagne")
+- Le nom de l'institution dont le point de vue est défendu par le texte, exemple "./PDV Delegation Française", "./PDV Commission Européenne", "./PDV ONG", "./PDV Présidence du groupe Ad Hoc Immigration"
+
 
 Champs supplémentaires:
 - Date de consultation: extraite du nom de fichier Camscanner (format DD/MM/YYYY)

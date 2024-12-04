@@ -16,7 +16,7 @@ Format de sortie JSON attendu :
     "language": str | None,    # Langue originale du document (ex: "fra", "eng")
     "tags": [                  # Liste des tags automatiques
         {
-            "tag": str         # Format: "./TAG" (ex: "./SCH", "./Libre Circulation")
+            "tag": str         # Format: "./TAG" (ex: "./Libre Circulation")
         }
     ]
 }
@@ -31,7 +31,5 @@ Notes importantes :
 4. Le champ place doit toujours être en anglais
 5. Le champ date doit strictement suivre le format DD/MM/YYYY
 6. Pour les tags :
-   - Toujours préfixés par "./"
-   - Inclure le préfixe du numéro de rapport (ex: "./SCH" pour SCH/II-AS)
-   - Inclure les titres des sections/chapitres numérotés
+   - Toujours préfixés par "./", toujours en français
 7. Retourner uniquement le JSON, sans autre texte ou formatage
