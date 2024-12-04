@@ -33,10 +33,10 @@ LLM_CONFIG = {
     # Configuration pour OpenRouter
     'openrouter': {
         'base_url': 'https://openrouter.ai/api/v1',
-        'model_name': 'openai/gpt-4o-mini-2024-07-18',  # Par défaut, à ajuster selon les besoins
+        'model_name': 'google/gemini-flash-1.5',  # Par défaut, à ajuster selon les besoins
         'costs': {
-            'input_tokens': Decimal('0.15'),  # À ajuster selon le modèle
-            'output_tokens': Decimal('0.6')
+            'input_tokens': Decimal('0.075'),  # À ajuster selon le modèle
+            'output_tokens': Decimal('0.3')
         }
     },
     

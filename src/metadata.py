@@ -86,9 +86,6 @@ class MetadataExtractor:
             try:
                 import json
                 metadata = json.loads(json_str)
-                
-                print("Métadonnées parsées :", metadata)  # Debug
-                
                 # Valider le format
                 self._validate_output_format(metadata)
                 

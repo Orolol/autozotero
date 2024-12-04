@@ -4,6 +4,8 @@
 import os
 import sys
 import argparse
+import time
+from datetime import timedelta
 from dotenv import load_dotenv
 
 from src.updater import ZoteroMetadataUpdater
@@ -119,16 +121,19 @@ Exemples d'utilisation :
             processed = []
             skipped = []
             failed = []
-            
+            processing_times = []  # Liste pour stocker les temps de traitement
             
             for i, pdf_path in enumerate(pdf_files, 1):
+                item_start_time = time.time()  # Début du chronomètre par item
                 try:
                     print(f"\n[{i}/{len(pdf_files)}] Traitement de {os.path.basename(pdf_path)}")
                     
                     if not args.dry_run:
                         item = updater.process_pdf(pdf_path, collections, args.ocr)
                         processed.append(item['key'])
-                        print(f"✓ PDF importé et métadonnées mises à jour")
+                        processing_time = time.time() - item_start_time
+                        processing_times.append(processing_time)
+                        print(f"✓ PDF importé et métadonnées mises à jour (en {processing_time:.1f}s)")
                     else:
                         print(f"✓ (Simulation) PDF serait importé")
                     
@@ -144,7 +149,12 @@ Exemples d'utilisation :
                     failed.append(pdf_path)
             
             # Afficher le résumé
+            total_time = time.time() - start_time
             print(f"\nRésumé du traitement :")
+            print(f"- Durée totale: {str(timedelta(seconds=int(total_time)))}")
+            if processing_times:
+                avg_time = sum(processing_times) / len(processing_times)
+                print(f"- Temps moyen par document: {avg_time:.1f}s")
             print(f"- {len(processed)} documents traités avec succès")
             print(f"- {len(skipped)} documents ignorés (doublons)")
             print(f"- {len(failed)} documents en erreur")
@@ -189,26 +199,33 @@ Exemples d'utilisation :
             processed = []
             skipped = []
             failed = []
+            processing_times = []
             
             for item in items_to_process:
+                item_start_time = time.time()
                 try:
-                    print(f"\nTraitement de l'item {item['key']} ({item['data'].get('title', 'Sans titre')})")
                     updated = updater.check_and_update_metadata(item, force_update=True, use_ocr=args.ocr)
-                    
+                    processing_time = time.time() - item_start_time
+                    processing_times.append(processing_time)
                     if updated:
-                        print(f"✓ Métadonnées mises à jour pour l'item {item['key']}")
+                        print(f"✓ Métadonnées mises à jour pour l'item {item['key']} (en {processing_time:.1f}s)")
                         processed.append(item['key'])
                     else:
-                        print(f"- Pas de mise à jour nécessaire pour l'item {item['key']}")
+                        print(f"- Pas de mise à jour nécessaire pour l'item {item['key']} (en {processing_time:.1f}s)")
                         skipped.append(item['key'])
                 except Exception as e:
                     print(f"✗ Erreur lors du traitement de l'item {item['key']}: {str(e)}")
                     failed.append(item['key'])
         
             # Afficher le résumé
+            total_time = time.time() - start_time
             print(f"\nRésumé du traitement :")
+            print(f"- Durée totale: {str(timedelta(seconds=int(total_time)))}")
+            if processing_times:
+                avg_time = sum(processing_times) / len(processing_times)
+                print(f"- Temps moyen par document: {avg_time:.1f}s")
             print(f"- {len(processed)} documents traités avec succès")
-            print(f"- {len(skipped)} documents ignorés (doublons)")
+            print(f"- {len(skipped)} documents ignorés")
             print(f"- {len(failed)} documents en erreur")
             
             if failed:
