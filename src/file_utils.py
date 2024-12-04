@@ -48,22 +48,29 @@ def extract_metadata_from_filename(filename: str) -> Optional[dict]:
     Extrait la date et l'heure d'un nom de fichier Camscanner.
     
     Args:
-        filename: Nom du fichier
+        filename: Nom du fichier (format: 'CamScanner DD-MM-YYYY HH.MM_hnOCR.pdf')
         
     Returns:
-        Dictionnaire contenant la date et l'heure, ou None
+        Dictionnaire contenant la date au format ISO 8601 (YYYY-MM-DD) et l'heure
     """
     import re
     from datetime import datetime
     
-    pattern = r"Camscanner (\d{2}-\d{2}-\d{4}) (\d{2}:\d{2})_hnOCR\.pdf"
+    # Nouveau pattern qui correspond au format réel
+    pattern = r"CamScanner (\d{2}-\d{2}-\d{4}) (\d{2}\.\d{2})_hnOCR\.pdf"
     match = re.match(pattern, filename)
     
     if match:
-        date_str, time = match.groups()
-        date_obj = datetime.strptime(date_str, "%d-%m-%Y")
-        return {
-            "accessDate": date_obj.strftime("%d/%m/%Y"),
-            "scanTime": time
-        }
+        date_str, time_str = match.groups()
+        try:
+            date_obj = datetime.strptime(date_str, "%d-%m-%Y")
+            # Convertir le point en : pour le temps
+            time_str = time_str.replace('.', ':')
+            return {
+                "accessDate": date_obj.strftime("%Y-%m-%d"),  # Format ISO 8601
+                "extra": time_str
+            }
+        except ValueError as e:
+            print(f"Erreur lors du parsing de la date: {e}")
+            return None
     return None 

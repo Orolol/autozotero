@@ -231,6 +231,8 @@ class ZoteroMetadataUpdater:
         # Utiliser le premier PDF trouvé
         pdf_attachment = pdf_attachments[0]
         
+        pdf_filename = pdf_attachment['data'].get('filename')
+        
         # Créer un dossier temporaire pour le PDF
         import tempfile
         import os
@@ -257,6 +259,10 @@ class ZoteroMetadataUpdater:
             
             # Formater les métadonnées pour Zotero
             formatted_metadata = self._format_metadata_for_zotero(raw_metadata)
+            
+            filename_metadata = extract_metadata_from_filename(pdf_filename)
+            if filename_metadata:
+                formatted_metadata.update(filename_metadata)
             
             # Mettre à jour l'item avec les nouvelles métadonnées
             item['data'].update(formatted_metadata)
