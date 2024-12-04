@@ -34,8 +34,8 @@ LLM_CONFIG = {
     
     # Configuration pour Llama local
     'llama': {
-        'repo_id': 'Qwen/Qwen2.5-32B-Instruct-GGUF',
-        'filename': 'qwen2.5-32b-instruct-q4_k_m.gguf',
+        'repo_id': 'bartowski/Qwen2.5-32B-Instruct-GGUF',
+        'filename': 'Qwen2.5-32B-Instruct-Q4_K_M.gguf',
         'n_ctx': 10000,
         'verbose': False,
         'costs': {
