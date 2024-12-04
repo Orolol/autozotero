@@ -3,7 +3,7 @@
 import os
 from typing import Dict, List, Any, Optional
 from docling.document_converter import DocumentConverter, InputFormat, PdfFormatOption
-import pytesseract
+
 from pyzotero import zotero
 
 from .config import DEFAULT_OCR_CONFIG, LLM_CONFIG
@@ -32,16 +32,7 @@ class ZoteroMetadataUpdater:
             use_openrouter: Utiliser OpenRouter au lieu de Claude
             openrouter_config: Configuration pour OpenRouter (optionnel)
         """
-        # Vérifier la présence de Tesseract
-        try:
-            pytesseract.get_tesseract_version()
-        except Exception as e:
-            raise RuntimeError(
-                "Tesseract n'est pas correctement installé. Veuillez suivre les instructions d'installation : "
-                "https://github.com/UB-Mannheim/tesseract/wiki\n"
-                f"Erreur : {str(e)}"
-            )
-        
+
         # Initialiser la connexion Zotero
         self.zot = zotero.Zotero(library_id, library_type, api_key)
         

@@ -1,20 +1,12 @@
 """Configuration du projet."""
 
-from docling.datamodel.pipeline_options import PdfPipelineOptions, TesseractOcrOptions, EasyOcrOptions
+from docling.datamodel.pipeline_options import PdfPipelineOptions, EasyOcrOptions
 from decimal import Decimal
 
 # Configuration OCR
 DEFAULT_OCR_CONFIG = PdfPipelineOptions()
 DEFAULT_OCR_CONFIG.do_ocr = True
-DEFAULT_OCR_CONFIG.ocr_options = TesseractOcrOptions(
-    force_full_page_ocr=True,
-    lang=["fra", "eng"]
-)
-
-# Configuration alternative avec EasyOCR
-EASYOCR_CONFIG = PdfPipelineOptions()
-EASYOCR_CONFIG.do_ocr = True
-EASYOCR_CONFIG.ocr_options = EasyOcrOptions(
+DEFAULT_OCR_CONFIG.ocr_options = EasyOcrOptions(
     force_full_page_ocr=True,
     use_gpu=True
 )
