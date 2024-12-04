@@ -6,4 +6,5 @@ docling>=0.1.0
 pytesseract>=0.3.10
 llama-cpp-python>=0.2.56 
 transformers
-torch
+torch==2.1.0
+openai

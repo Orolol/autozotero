@@ -34,9 +34,9 @@ LLM_CONFIG = {
     
     # Configuration pour Llama local
     'llama': {
-        'repo_id': 'QuantFactory/Qwen2.5-7B-GGUF',
-        'filename': 'Qwen2.5-7B.Q4_K_M.gguf',
-        'n_ctx': 5000,
+        'repo_id': 'Qwen/Qwen2.5-Coder-32B-Instruct-GGUF',
+        'filename': 'qwen2.5-coder-32b-instruct-q8_0.gguf',
+        'n_ctx': 10000,
         'verbose': False,
         'costs': {
             'input_tokens': Decimal('0'),  # Gratuit car local
