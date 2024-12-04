@@ -13,6 +13,8 @@ from src.file_utils import find_pdf_files
 from src.config import VALID_ITEM_TYPES
 
 def main():
+    start_time = time.time()  # Début du chronomètre global
+    
     parser = argparse.ArgumentParser(
         description='Mise à jour des métadonnées Zotero',
         formatter_class=argparse.RawDescriptionHelpFormatter,
