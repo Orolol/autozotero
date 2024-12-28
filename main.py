@@ -10,7 +10,6 @@ from dotenv import load_dotenv
 
 from src.updater import ZoteroMetadataUpdater
 from src.file_utils import find_pdf_files
-from src.config import VALID_ITEM_TYPES
 
 def main():
     start_time = time.time()  # Début du chronomètre global
@@ -188,9 +187,9 @@ Exemples d'utilisation :
         # Traitement de tous les documents
         else:
             print("Traitement de tous les documents...")
-             # Traiter tous les documents
+            # Traiter tous les documents
             valid_types = ['document', 'journalArticle', 'bookSection', 'report', 'thesis', 'webpage']
-            items = updater.zot.items(itemType="-attachment")  # Récupère tous les items non-attachements
+            items = updater.zot_client.get_all_items(item_type="-attachment")
             print(f"Nombre total d'items trouvés: {len(items)}")
             
             # Filtrer les items par type
@@ -218,7 +217,7 @@ Exemples d'utilisation :
                 except Exception as e:
                     print(f"✗ Erreur lors du traitement de l'item {item['key']}: {str(e)}")
                     failed.append(item['key'])
-        
+            
             # Afficher le résumé
             total_time = time.time() - start_time
             print(f"\nRésumé du traitement :")
@@ -232,8 +231,8 @@ Exemples d'utilisation :
             
             if failed:
                 print("\nDocuments en erreur :")
-                for path in failed:
-                    print(f"- {path}")
+                for item_key in failed:
+                    print(f"- {item_key}")
             
             # Afficher les coûts
             if not args.dry_run and processed:
@@ -242,7 +241,6 @@ Exemples d'utilisation :
                 print(f"Tokens en entrée: {cost_stats['input_tokens']:,}")
                 print(f"Tokens en sortie: {cost_stats['output_tokens']:,}")
                 print(f"Coût total: ${cost_stats['total_cost']:.4f}")
-            sys.exit(1)
             
     except Exception as e:
         print(f"Erreur : {str(e)}")

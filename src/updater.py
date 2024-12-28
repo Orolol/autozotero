@@ -4,8 +4,6 @@ import os
 from typing import Dict, List, Any, Optional
 from docling.document_converter import DocumentConverter, InputFormat, PdfFormatOption
 
-from pyzotero import zotero
-
 from .config import DEFAULT_OCR_CONFIG, LLM_CONFIG
 from .file_utils import calculate_file_hash, extract_metadata_from_filename
 from .metadata import MetadataExtractor
@@ -34,7 +32,7 @@ class ZoteroMetadataUpdater:
         """
 
         # Initialiser la connexion Zotero
-        self.zot = zotero.Zotero(library_id, library_type, api_key)
+        self.zot_client = ZoteroClient(library_id, library_type, api_key)
         
         # Initialiser les clients
         if use_local_model:
@@ -93,32 +91,15 @@ class ZoteroMetadataUpdater:
         file_hash = calculate_file_hash(pdf_path)
         
         # Rechercher dans les attachements existants
-        for item in self.zot.items(itemType='attachment', format='json'):
-            if item.get('data', {}).get('md5', '') == file_hash:
-                parent = item.get('data', {}).get('parentItem')
-                if parent:
-                    raise ValueError(f"Ce PDF existe déjà dans Zotero (ID: {parent})")
+        existing_parent = self.zot_client.check_duplicate(file_hash)
+        if existing_parent:
+            raise ValueError(f"Ce PDF existe déjà dans Zotero (ID: {existing_parent})")
         
-        # Créer d'abord l'item parent
-        parent_template = self.zot.item_template('report')
-        parent_result = self.zot.create_items([parent_template])
-        parent_key = parent_result['successful']['0']['key']
+        # Créer l'item parent
+        parent_item = self.zot_client.create_item('report', collections)
         
-        # Récupérer l'item parent complet
-        parent_item = self.zot.item(parent_key)
-        
-        # Créer l'attachement
-        attachment_template = self.zot.item_template('attachment', linkmode='imported_file')
-        attachment_template['itemType'] = 'attachment'
-        attachment_template['contentType'] = 'application/pdf'
-        attachment_template['filename'] = os.path.basename(pdf_path)
-        attachment_template['parentItem'] = parent_key
-        
-        if collections:
-            attachment_template['collections'] = collections
-        
-        # Créer l'attachement avec le fichier PDF
-        self.zot.create_items([attachment_template], parent_key)
+        # Attacher le PDF
+        self.zot_client.attach_pdf(parent_item['key'], pdf_path)
         
         # Extraire le texte avec ou sans OCR
         if use_ocr:
@@ -142,7 +123,7 @@ class ZoteroMetadataUpdater:
         # Mettre à jour l'item parent avec les métadonnées
         formatted_metadata = self._format_metadata_for_zotero(metadata)
         parent_item['data'].update(formatted_metadata)
-        self.zot.update_item(parent_item)
+        self.zot_client.update_metadata(parent_item['key'], formatted_metadata)
         
         return parent_item
 
@@ -221,7 +202,7 @@ class ZoteroMetadataUpdater:
             return False
 
         # Récupérer les attachements PDF
-        attachments = self.zot.children(item['key'], itemType='attachment')
+        attachments = self.zot_client.children(item['key'], itemType='attachment')
         pdf_attachments = [a for a in attachments if a['data'].get('contentType') == 'application/pdf']
         
         if not pdf_attachments:
@@ -237,11 +218,10 @@ class ZoteroMetadataUpdater:
         import tempfile
         import os
         
-        
         with tempfile.TemporaryDirectory() as temp_dir:
             # Télécharger le PDF
             pdf_path = os.path.join(temp_dir, 'temp.pdf')
-            self.zot.dump(pdf_attachment['key'], pdf_path)
+            self.zot_client.dump(pdf_attachment['key'], pdf_path)
             
             # Extraire le texte du PDF
             if use_ocr:
@@ -267,6 +247,6 @@ class ZoteroMetadataUpdater:
             # Mettre à jour l'item avec les nouvelles métadonnées
             item['data'].update(formatted_metadata)
             item['data']['itemType'] = 'report'
-            self.zot.update_item(item)
+            self.zot_client.update_metadata(item['key'], item['data'])
             
             return True

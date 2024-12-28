@@ -25,10 +25,10 @@ LLM_CONFIG = {
     # Configuration pour OpenRouter
     'openrouter': {
         'base_url': 'https://openrouter.ai/api/v1',
-        'model_name': 'google/gemini-flash-1.5',  # Par défaut, à ajuster selon les besoins
+        'model_name': 'deepseek/deepseek-chat',  # Par défaut, à ajuster selon les besoins
         'costs': {
-            'input_tokens': Decimal('0.075'),  # À ajuster selon le modèle
-            'output_tokens': Decimal('0.3')
+            'input_tokens': Decimal('0.14'),  # À ajuster selon le modèle
+            'output_tokens': Decimal('0.28')
         }
     },
     
@@ -44,13 +44,3 @@ LLM_CONFIG = {
         }
     }
 }
-
-# Types de documents valides
-VALID_ITEM_TYPES = [
-    'document',
-    'journalArticle',
-    'bookSection',
-    'report',
-    'thesis',
-    'webpage'
-] 

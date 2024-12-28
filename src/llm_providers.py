@@ -81,7 +81,7 @@ class OpenRouterProvider(LLMProvider):
         try:
             response = self.client.chat.completions.create(
                 model=self.model_name,
-            messages=messages
+                messages=messages
             )
         except Exception as e:
             print(f"Erreur lors de la génération : {e}")

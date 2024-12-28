@@ -65,15 +65,24 @@ class MetadataExtractor:
         Répondre uniquement en JSON.
         """
 
-        system_prompt = "Vous êtes un assistant spécialisé dans l'extraction de métadonnées de documents administratifs, suivant des règles strictes. Vous répondez en JSON, lu par du Python (null pour une valeur nulle)."
+        system_prompt = "Vous êtes un assistant spécialisé dans l'extraction de métadonn��es de documents administratifs, suivant des règles strictes. Vous répondez en JSON, lu par du Python (null pour une valeur nulle)."
         
         try:
             # Générer la réponse
             result = self.llm.generate(prompt, system_prompt)
             
+            if not result or not isinstance(result, dict):
+                raise ValueError("Le LLM n'a pas retourné une réponse valide")
+                
+            if 'content' not in result:
+                raise ValueError("La réponse du LLM ne contient pas de contenu")
+                
+            if 'usage' not in result:
+                raise ValueError("La réponse du LLM ne contient pas les informations d'utilisation")
+            
             # Mettre à jour les compteurs de tokens
-            self.total_input_tokens += result['usage']['input_tokens']
-            self.total_output_tokens += result['usage']['output_tokens']
+            self.total_input_tokens += result['usage'].get('input_tokens', 0)
+            self.total_output_tokens += result['usage'].get('output_tokens', 0)
             
             # Extraire et nettoyer le JSON
             json_str = self._extract_json_from_text(result['content'])
@@ -97,10 +106,9 @@ class MetadataExtractor:
                 raise ValueError(f"JSON invalide : {e}")
             
         except Exception as e:
-            print(e)
-            print("Sortie brute du LLM :")
-            print(result['content'] if 'content' in result else "Pas de contenu disponible")
-            raise ValueError(f"Erreur lors de l'extraction des métadonnées: {str(e)}")
+            print(f"Erreur lors de l'extraction des métadonnées : {str(e)}")
+            print("Réponse du LLM :", result if 'result' in locals() else "Pas de réponse")
+            raise ValueError(f"Erreur lors de l'extraction des métadonnées : {str(e)}")
 
     def _extract_json_from_text(self, text: str) -> str:
         """
@@ -115,6 +123,9 @@ class MetadataExtractor:
         Raises:
             ValueError: Si aucun JSON valide n'est trouvé
         """
+        if not text:
+            raise ValueError("Le texte à analyser est vide")
+            
         start = text.find('{')
         end = text.rfind('}')
         
